@@ -1,10 +1,11 @@
 import sys
 # 更換
-package_path = r".\python-3.11.1\Lib\site-packages"
+package_path = r".\python-3.11.3\Lib\site-packages"
 if package_path not in sys.path:
     sys.path.append(package_path)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
+from PyQt5.QtWidgets import QLineEdit, QTextEdit
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver.common.by import By
@@ -15,72 +16,84 @@ import matplotlib.pyplot as plt
 import asyncio
 import time
 import aiohttp
+import thread
+import schedule
+
+with open('sheet.txt', 'r', encoding='utf-8') as file:
+    mysheet = file.read()
 
 
-# Step 1: Create a background thread to run the Selenium task
-class SeleniumThread(QThread):
-    result_signal = pyqtSignal(str)
-
-    def __init__(self):
-        super().__init__()
-        self.driver = None
-
-    def run(self):
-        # Initialize WebDriver (Edge in this case)
-        service = Service('msedgedriver.exe')
-        self.driver = webdriver.Edge(service=service)
-        
-        # Step 2: Open Google and update GUI
-        self.driver.get('https://www.google.com')
-        self.result_signal.emit("Google 頁面已打開")
-        
-        # Step 3: Find the search box and input '123'
-        search_box = self.driver.find_element(By.NAME, 'q')
-        search_box.send_keys('123')
-        self.result_signal.emit("已輸入 '123'")
-        search_box.send_keys(Keys.RETURN)
-
-        time.sleep(2)  # Wait for search results to load
-
-        # Step 4: Get the page title and send it back to the GUI
-        page_title = self.driver.title
-        self.result_signal.emit(f"搜尋結果頁面標題: {page_title}")
-
-        time.sleep(3)  # Wait for 3 seconds before closing the browser
-        self.driver.quit()  # Close the browser
-
-# Step 5: Create the PyQt5 GUI
-class MyApp(QWidget):
+class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Selenium + PyQt5 Example")
-        self.setGeometry(100, 100, 400, 200)
+        self.setWindowTitle("暫時測試用")
 
-        self.layout = QVBoxLayout()
+        self.setStyleSheet(mysheet)
 
-        self.label = QLabel("程式正在運行...", self)
-        self.layout.addWidget(self.label)
+        self.setFixedSize(600, 400)
 
-        self.setLayout(self.layout)
+        self.admin = QLineEdit(self)
+        self.admin.setPlaceholderText("帳號： ")
 
-        # Step 6: Create the Selenium background thread and start it immediately
-        self.selenium_thread = SeleniumThread()
-        self.selenium_thread.result_signal.connect(self.update_label)
+        self.password = QLineEdit(self)
+        self.password.setPlaceholderText("密碼： ")
+        self.password.setEchoMode(QLineEdit.Password) 
 
-        # Start the thread when the program runs
-        self.selenium_thread.start()
+        self.submit_button = QPushButton("啟動", self)
 
-    def update_label(self, result):
-        # Update the label with the result from the Selenium task
-        self.label.setText(result)
+        
+        # 創建一個文本區域用來顯示日志
+        self.log_display = QTextEdit(self)
+        self.log_display.setReadOnly(True)  # 設為只讀模式，防止用戶編輯
 
-# Step 7: Run the PyQt5 application
-def main():
-    app = QApplication(sys.argv)
-    window = MyApp()
-    window.show()
-    sys.exit(app.exec_())
+        # 連接按鈕點擊事件
+        self.submit_button.clicked.connect(self.on_submit)
+        
+        # 按下 password 那處的 enter 可以過
+        self.password.returnPressed.connect(self.on_submit)
+
+
+        # 創建佈局
+        layout = QVBoxLayout()
+        layout.addWidget(self.admin)
+        layout.addWidget(self.password)
+        layout.addWidget(self.submit_button)
+        layout.addWidget(self.log_display)
+        
+        # 設定佈局
+        self.setLayout(layout)
+
+    def on_submit(self):
+        # 獲取輸入框中的文本
+        text1 = self.admin.text()
+        text2 = self.password.text()
+
+        # 在日志區域中顯示
+        log_message = f"輸入1: {text1}\n輸入2: {text2}\n"
+        self.log_display.append(log_message)
+        
+        self.limit_log_lines()
+
+        # 清空輸入框
+        self.admin.clear()
+        self.password.clear()
+
+        self.submit_button.setEnabled(False)
+    
+    def limit_log_lines(self):
+        log_text = self.log_display.toPlainText()
+
+        log_lines = log_text.split('\n')
+
+        if len(log_lines) > 10:
+            log_lines = log_lines[-10: ]
+
+            self.log_display.setPlainText('\n'.join(log_lines))
+
 
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
